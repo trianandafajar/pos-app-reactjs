@@ -1,11 +1,13 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 
+// Fetch all products
 export const getProduct = createAsyncThunk("product/getProduct", async () => {
   const response = await axios.get("/products");
   return response.data;
 });
 
+// Fetch products by category
 export const getProductByCategory = createAsyncThunk(
   "product/getProductByCategory",
   async (category) => {
@@ -18,41 +20,42 @@ const productSlice = createSlice({
   name: "product",
   initialState: {
     data: null,
-    loading: false,
+    loading: "idle", // idle | loading | succeeded | failed
     error: null,
   },
   reducers: {},
   extraReducers: (builder) => {
+    // Fetch all products
     builder
       .addCase(getProduct.pending, (state) => {
-        state.loading = true;
+        state.loading = "loading"; // Set loading state
         state.error = null;
         state.data = null;
       })
       .addCase(getProduct.fulfilled, (state, action) => {
         state.data = action.payload;
-        state.loading = false;
+        state.loading = "succeeded"; // Request succeeded
         state.error = null;
       })
       .addCase(getProduct.rejected, (state, action) => {
         state.error = action.error.message;
-        state.loading = false;
+        state.loading = "failed"; // Request failed
         state.data = null;
       })
-      // get product by category
+      // Fetch products by category
       .addCase(getProductByCategory.pending, (state) => {
-        state.loading = true;
+        state.loading = "loading"; // Set loading state
         state.error = null;
         state.data = null;
       })
       .addCase(getProductByCategory.fulfilled, (state, action) => {
         state.data = action.payload;
-        state.loading = false;
+        state.loading = "succeeded"; // Request succeeded
         state.error = null;
       })
       .addCase(getProductByCategory.rejected, (state, action) => {
         state.error = action.error.message;
-        state.loading = false;
+        state.loading = "failed"; // Request failed
         state.data = null;
       });
   },
