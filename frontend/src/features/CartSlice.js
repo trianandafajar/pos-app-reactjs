@@ -1,55 +1,46 @@
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice, isPending, isRejected } from "@reduxjs/toolkit";
 import axios from "axios";
 
-// Fetch cart
-export const getCart = createAsyncThunk("cart/getCart", async () => {
-  const response = await axios.get("/carts");
-  return response.data;
-});
+// Helper: update specific item in array
+const updateItemInArray = (items, updatedItem) =>
+  items.map((item) => (item.id === updatedItem.id ? updatedItem : item));
 
-// Add new cart item
-export const inputCart = createAsyncThunk("cart/inputCart", async (data, { dispatch }) => {
-  await axios.post("/carts", data);
-  dispatch(getCart()); // Refetch or directly add item to state if needed
+// Thunks
+export const getCart = createAsyncThunk("cart/getCart", async () => {
+  const { data } = await axios.get("/carts");
   return data;
 });
 
-// Update existing cart item
-export const updateCart = createAsyncThunk("cart/updateCart", async (data) => {
-  await axios.put(`/carts/${data.id}`, data);
-  return data;  // Return updated data directly
+export const inputCart = createAsyncThunk("cart/inputCart", async (item, { dispatch }) => {
+  const { data } = await axios.post("/carts", item);
+  dispatch(getCart()); // Optionally re-fetch, or return updated list directly
+  return data;
 });
 
-// Delete cart item
+export const updateCart = createAsyncThunk("cart/updateCart", async (item) => {
+  const updated = { ...item, totalPrice: item.qty * item.price };
+  await axios.put(`/carts/${item.id}`, updated);
+  return updated;
+});
+
 export const delCart = createAsyncThunk("cart/delCart", async (id) => {
   await axios.delete(`/carts/${id}`);
-  return id;  // Return deleted ID
+  return id;
 });
 
-// Update cart with quantity calculation
-export const updCart = createAsyncThunk("cart/updCart", async (data) => {
-  data.totalPrice = data.qty * data.price;
-  await axios.put(`/carts/${data.id}`, data);
-  return data;  // Return updated data directly
-});
-
-// Save order and clear cart
 export const saveOrder = createAsyncThunk("cart/saveOrder", async (data, { dispatch }) => {
   await axios.post("/orders", data);
-  // After saving, empty the cart (no need to re-fetch if updating directly)
   dispatch(getCart());
   return [];
 });
 
-// Set cart detail for editing
-export const setDetail = createAsyncThunk("cart/setDetail", async (data) => {
-  return data;
-});
+export const setDetail = createAsyncThunk("cart/setDetail", async (data) => data);
 
+// Slice
 const cartSlice = createSlice({
   name: "cart",
   initialState: {
-    data: null,
+    data: [],
     loading: false,
     error: null,
     dataEdit: null,
@@ -57,63 +48,35 @@ const cartSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(getCart.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
       .addCase(getCart.fulfilled, (state, action) => {
         state.data = action.payload;
         state.loading = false;
       })
-      .addCase(getCart.rejected, (state, action) => {
-        state.error = action.error?.message || "Failed to fetch cart";
-        state.loading = false;
-      })
-      // Input cart item
       .addCase(inputCart.fulfilled, (state, action) => {
-        state.data = action.payload;  // Optionally update cart state
+        state.data.push(action.payload);
         state.loading = false;
       })
-      .addCase(inputCart.rejected, (state, action) => {
-        state.error = action.error?.message || "Failed to add item to cart";
-        state.loading = false;
-      })
-      // Update cart item
       .addCase(updateCart.fulfilled, (state, action) => {
-        const updatedCart = state.data.map(item =>
-          item.id === action.payload.id ? action.payload : item
-        );
-        state.data = updatedCart;
-        state.loading = false;
+        state.data = updateItemInArray(state.data, action.payload);
       })
-      .addCase(updateCart.rejected, (state, action) => {
-        state.error = action.error?.message || "Failed to update cart item";
-        state.loading = false;
+      .addCase(delCart.fulfilled, (state, action) => {
+        state.data = state.data.filter((item) => item.id !== action.payload);
       })
-      // Save order and reset cart
       .addCase(saveOrder.fulfilled, (state) => {
-        state.loading = false;
-        state.error = null;
-        state.data = [];  // Reset cart after order
+        state.data = [];
       })
-      .addCase(saveOrder.rejected, (state, action) => {
-        state.error = action.error?.message || "Failed to save order";
-        state.loading = false;
-      })
-      // Set cart detail for editing
       .addCase(setDetail.fulfilled, (state, action) => {
         state.dataEdit = action.payload;
       })
-      // Delete cart item
-      .addCase(delCart.fulfilled, (state, action) => {
-        state.data = state.data.filter(item => item.id !== action.payload);
+
+      // DRY handlers for pending/rejected
+      .addMatcher(isPending(getCart, inputCart, updateCart, delCart, saveOrder), (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      // Update cart item with quantity calculation
-      .addCase(updCart.fulfilled, (state, action) => {
-        const updatedCart = state.data.map(item =>
-          item.id === action.payload.id ? action.payload : item
-        );
-        state.data = updatedCart;
+      .addMatcher(isRejected(getCart, inputCart, updateCart, delCart, saveOrder), (state, action) => {
+        state.loading = false;
+        state.error = action.error?.message || "Something went wrong";
       });
   },
 });
