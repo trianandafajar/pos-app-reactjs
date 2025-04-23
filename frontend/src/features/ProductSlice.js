@@ -2,60 +2,73 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 
 // Fetch all products
-export const getProduct = createAsyncThunk("product/getProduct", async () => {
-  const response = await axios.get("/products");
-  return response.data;
-});
+export const getProduct = createAsyncThunk(
+  "product/getProduct",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get("/products");
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
 
 // Fetch products by category
 export const getProductByCategory = createAsyncThunk(
   "product/getProductByCategory",
-  async (category) => {
-    const response = await axios.get(`/products?category_id=${category}`);
-    return response.data;
+  async (category, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get(`/products?category_id=${category}`);
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
   }
 );
 
+// Initial state
+const initialState = {
+  data: null,
+  loading: "idle", // idle | loading | succeeded | failed
+  error: null,
+};
+
 const productSlice = createSlice({
   name: "product",
-  initialState: {
-    data: null,
-    loading: "idle", // idle | loading | succeeded | failed
-    error: null,
-  },
+  initialState,
   reducers: {},
   extraReducers: (builder) => {
-    // Fetch all products
     builder
+      // Get all products
       .addCase(getProduct.pending, (state) => {
-        state.loading = "loading"; // Set loading state
+        state.loading = "loading";
         state.error = null;
         state.data = null;
       })
       .addCase(getProduct.fulfilled, (state, action) => {
         state.data = action.payload;
-        state.loading = "succeeded"; // Request succeeded
-        state.error = null;
+        state.loading = "succeeded";
       })
       .addCase(getProduct.rejected, (state, action) => {
-        state.error = action.error.message;
-        state.loading = "failed"; // Request failed
+        state.error = action.payload || "Failed to fetch products";
+        state.loading = "failed";
         state.data = null;
       })
-      // Fetch products by category
+
+      // Get products by category
       .addCase(getProductByCategory.pending, (state) => {
-        state.loading = "loading"; // Set loading state
+        state.loading = "loading";
         state.error = null;
         state.data = null;
       })
       .addCase(getProductByCategory.fulfilled, (state, action) => {
         state.data = action.payload;
-        state.loading = "succeeded"; // Request succeeded
-        state.error = null;
+        state.loading = "succeeded";
       })
       .addCase(getProductByCategory.rejected, (state, action) => {
-        state.error = action.error.message;
-        state.loading = "failed"; // Request failed
+        state.error = action.payload || "Failed to fetch products by category";
+        state.loading = "failed";
         state.data = null;
       });
   },
