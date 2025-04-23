@@ -5,47 +5,54 @@ import {
 } from "@reduxjs/toolkit";
 import axios from "axios";
 
-// Fetch all categories
+// Thunk untuk ambil semua kategori
 export const getAllCategory = createAsyncThunk(
   "category/getAllCategory",
-  async () => {
-    const response = await axios.get("/categories");
-    return response.data;
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get("/categories");
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
   }
 );
 
-// Create an entity adapter to normalize state
-const categoryEntity = createEntityAdapter({
+// Adapter untuk normalisasi state
+const categoryAdapter = createEntityAdapter({
   selectId: (category) => category.id,
 });
 
-// Initial state with loading and error handling
+// Initial state pakai adapter + custom fields
+const initialState = categoryAdapter.getInitialState({
+  loading: "idle", // idle | loading | succeeded | failed
+  error: null,
+});
+
+// Slice
 const categorySlice = createSlice({
   name: "category",
-  initialState: categoryEntity.getInitialState({
-    loading: "idle", // idle | loading | succeeded | failed
-    error: null,
-  }),
+  initialState,
   reducers: {},
   extraReducers: (builder) => {
     builder
       .addCase(getAllCategory.pending, (state) => {
-        state.loading = "loading"; // Set loading state when request starts
-        state.error = null; // Clear any previous errors
+        state.loading = "loading";
+        state.error = null;
       })
       .addCase(getAllCategory.fulfilled, (state, action) => {
-        state.loading = "succeeded"; // Set loading to succeeded once the data is fetched
-        categoryEntity.setAll(state, action.payload);
+        state.loading = "succeeded";
+        categoryAdapter.setAll(state, action.payload);
       })
       .addCase(getAllCategory.rejected, (state, action) => {
-        state.loading = "failed"; // Set loading to failed if the request fails
-        state.error = action.error.message; // Store the error message
+        state.loading = "failed";
+        state.error = action.payload || "Failed to fetch categories";
       });
   },
 });
 
-// Export selectors to use in the component
-export const categorySelectors = categoryEntity.getSelectors(
+// Selector yang udah siap pakai
+export const categorySelectors = categoryAdapter.getSelectors(
   (state) => state.category
 );
 
